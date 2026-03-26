@@ -1,0 +1,41 @@
+[tool.poetry]
+name = "python-pixel-hunter-api"
+version = "0.1.0"
+description = "HD image search API built with FastAPI"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT"
+packages = [{ include = "app" }]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<4.0"
+fastapi = "0.116.1"
+uvicorn = "0.35.0"
+httpx = "0.28.1"
+requests = "2.32.5"
+cloudscraper = "1.2.71"
+selectolax = "0.3.26"
+selenium = "4.34.2"
+pillow = "11.3.0"
+
+[dependency-groups]
+dev = ["pytest (>=8.4.2,<9.0.0)"]
+
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+    "import-outside-toplevel",
+    "unused-import",
+    "no-member",
+    "invalid-name",
+    "self-assigning-variable",
+    "protected-access",
+]
+
+[tool.isort]
+known_first_party = ["app"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
