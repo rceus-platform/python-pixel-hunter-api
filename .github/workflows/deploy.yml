@@ -59,6 +59,7 @@ jobs:
             cd "$APP_WORKDIR"
 
             POETRY_BIN="/home/ubuntu/.local/bin/poetry"
+            sudo -u ubuntu "$POETRY_BIN" env use python3.12
             if [ ! -d ".venv" ]; then
               sudo -u ubuntu "$POETRY_BIN" install --no-root --no-interaction
             else
