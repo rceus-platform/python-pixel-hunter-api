@@ -59,12 +59,12 @@ jobs:
             cd "$APP_WORKDIR"
 
             POETRY_BIN="/home/ubuntu/.local/bin/poetry"
-            sudo -u ubuntu "$POETRY_BIN" env use python3.12
             if [ ! -d ".venv" ]; then
-              sudo -u ubuntu "$POETRY_BIN" install --no-root --no-interaction
-            else
-              echo "⚡ Using existing .venv"
+              echo "📦 Creating .venv with Python 3.12"
+              sudo -u ubuntu python3.12 -m venv .venv
             fi
+            echo "📦 Installing dependencies"
+            sudo -u ubuntu "$POETRY_BIN" install --no-root --no-interaction
 
             echo "🔁 Restarting service"
             sudo systemctl daemon-reload

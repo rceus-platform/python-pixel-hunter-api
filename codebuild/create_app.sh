@@ -64,17 +64,17 @@ export PATH="/home/$DEPLOY_USER/.local/bin:$PATH"
 # RUNTIME SETUP
 # ================================
 if [ "$RUNTIME" = "python" ]; then
-  echo "🐍 Python setup with Poetry"
+  echo "🐍 Python setup with Poetry (Python 3.12)"
 
-  sudo -u "$DEPLOY_USER" "$POETRY_BIN" env use python3.12
   sudo -u "$DEPLOY_USER" "$POETRY_BIN" config virtualenvs.in-project true
 
   if [ ! -d ".venv" ]; then
-    echo "📦 Installing dependencies"
-    sudo -u "$DEPLOY_USER" "$POETRY_BIN" install --no-root --no-interaction
-  else
-    echo "⚡ Using existing .venv"
+    echo "📦 Creating .venv with Python 3.12"
+    sudo -u "$DEPLOY_USER" python3.12 -m venv .venv
   fi
+
+  echo "📦 Installing dependencies"
+  sudo -u "$DEPLOY_USER" "$POETRY_BIN" install --no-root --no-interaction
 
   if [ ! -d ".venv" ]; then
     echo "❌ .venv not created"
