@@ -48,7 +48,8 @@ sudo apt-get install -y python3-pip python3-venv python3-dev jq
 sudo python3 -m ensurepip --upgrade || true
 
 # Install Poetry (NO pipx)
-if ! sudo -u "$DEPLOY_USER" command -v poetry >/dev/null 2>&1; then
+POETRY_BIN="/home/$DEPLOY_USER/.local/bin/poetry"
+if ! sudo -u "$DEPLOY_USER" [ -x "$POETRY_BIN" ]; then
   echo "📥 Installing Poetry"
   sudo -u "$DEPLOY_USER" python3 -m pip install --user poetry
 fi
@@ -61,11 +62,11 @@ export PATH="/home/$DEPLOY_USER/.local/bin:$PATH"
 if [ "$RUNTIME" = "python" ]; then
   echo "🐍 Python setup with Poetry"
 
-  sudo -u "$DEPLOY_USER" poetry config virtualenvs.in-project true
+  sudo -u "$DEPLOY_USER" "$POETRY_BIN" config virtualenvs.in-project true
 
   if [ ! -d ".venv" ]; then
     echo "📦 Installing dependencies"
-    sudo -u "$DEPLOY_USER" poetry install --no-root --no-interaction
+    sudo -u "$DEPLOY_USER" "$POETRY_BIN" install --no-root --no-interaction
   else
     echo "⚡ Using existing .venv"
   fi
