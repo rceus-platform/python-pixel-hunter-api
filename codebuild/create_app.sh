@@ -51,23 +51,20 @@ chmod -R u+rwX,g+rwX "$APP_WORKDIR"
 # RUNTIME SETUP
 # ================================
 if [ "$RUNTIME" = "python" ]; then
-  echo "🐍 Python setup"
+  echo "🐍 Python setup with Poetry"
 
-  if [ ! -d ".venv" ]; then
-    sudo -u "$DEPLOY_USER" python3 -m venv .venv
+  # Install poetry if missing
+  if ! sudo -u "$DEPLOY_USER" command -v poetry &> /dev/null; then
+    echo "📥 Installing Poetry"
+    sudo -u "$DEPLOY_USER" pipx install poetry || sudo -u "$DEPLOY_USER" python3 -m pip install --user poetry
+    export PATH="$PATH:/home/ubuntu/.local/bin"
   fi
 
-  sudo -u "$DEPLOY_USER" .venv/bin/pip install --upgrade pip
-  sudo -u "$DEPLOY_USER" .venv/bin/pip install -r requirements.txt
+  # Configure poetry to create virtualenv in-project
+  sudo -u "$DEPLOY_USER" poetry config virtualenvs.in-project true
 
-  if [ -f manage.py ]; then
-    echo "🗄️ Running Django migrations"
-    sudo -u "$DEPLOY_USER" .venv/bin/python manage.py migrate --noinput
-    if [ -f "db.sqlite3" ]; then
-      chown "$DEPLOY_USER:$DEPLOY_USER" "db.sqlite3"
-      chmod 664 "db.sqlite3"
-    fi
-  fi
+  # Install dependencies
+  sudo -u "$DEPLOY_USER" poetry install --no-root --no-interaction
 fi
 
 # ================================
@@ -84,7 +81,6 @@ WorkingDirectory=${APP_WORKDIR}
 UMask=0002
 
 Environment=APP_SECRET_JSON=${APP_SECRET_PATH}
-Environment=DJANGO_SETTINGS_MODULE=trigger_engine.settings
 Environment=PYTHONPATH=${APP_WORKDIR}
 
 ExecStart=${APP_WORKDIR}/${START_CMD}
@@ -95,34 +91,9 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-cat > "/etc/systemd/system/${APP_NAME}-qcluster.service" <<EOF
-[Unit]
-Description=${APP_NAME} QCluster Worker
-After=network.target
-
-[Service]
-User=ubuntu
-WorkingDirectory=${APP_WORKDIR}
-UMask=0002
-
-Environment=APP_SECRET_JSON=${APP_SECRET_PATH}
-Environment=DJANGO_SETTINGS_MODULE=trigger_engine.settings
-Environment=PYTHONPATH=${APP_WORKDIR}
-
-ExecStart=${APP_WORKDIR}/.venv/bin/python ${APP_WORKDIR}/manage.py qcluster
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
 systemctl daemon-reload
 systemctl enable "${APP_NAME}"
 systemctl restart "${APP_NAME}"
-
-systemctl enable "${APP_NAME}-qcluster"
-systemctl restart "${APP_NAME}-qcluster"
 
 # ================================
 # NGINX (GENERATED)

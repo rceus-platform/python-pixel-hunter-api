@@ -1,0 +1,16 @@
+// {
+//   "python.defaultInterpreterPath": "${workspaceFolder}/application-source/.venv/bin/python",
+//   "python.analysis.extraPaths": [
+//     "${workspaceFolder}/application-source"
+//   ],
+//   "python.analysis.include": [
+//     "application-source"
+//   ],
+//   "pylint.cwd": "${workspaceFolder}/application-source",
+//   "pylint.args": [
+//     "--disable=import-outside-toplevel,broad-exception-caught,unused-import,no-member,invalid-name,self-assigning-variable,protected-access"
+//   ],
+//   "python.analysis.diagnosticMode": "workspace",
+//   "snyk.advanced.organization": "48320d3a-2c35-4e33-a1a2-d3c24261916f",
+//   "snyk.advanced.autoSelectOrganization": true
+// }

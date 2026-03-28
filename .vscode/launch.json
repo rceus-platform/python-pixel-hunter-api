@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "FastAPI: pixel-hunter-api",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "python": "${workspaceFolder}/application-source/.venv/bin/python",
+            "cwd": "${workspaceFolder}/application-source",
+            "args": [
+                "app.main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+                "--reload"
+            ],
+            "justMyCode": true,
+            "console": "integratedTerminal",
+            "envFile": "${workspaceFolder}/application-source/.env",
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1"
+            }
+        }
+    ]
+}
