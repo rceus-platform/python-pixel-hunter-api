@@ -34,18 +34,18 @@ fi
 
 cd "$APP_WORKDIR"
 
-chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_WORKDIR"
-chmod -R u+rwX,g+rwX "$APP_WORKDIR"
+sudo chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_WORKDIR"
+sudo chmod -R u+rwX,g+rwX "$APP_WORKDIR"
 
 # ================================
 # PYTHON TOOLING
 # ================================
 echo "🔧 Installing Python tooling"
 
-apt-get update -y
-apt-get install -y python3-pip python3-venv python3-dev jq
+sudo apt-get update -y
+sudo apt-get install -y python3-pip python3-venv python3-dev jq
 
-python3 -m ensurepip --upgrade || true
+sudo python3 -m ensurepip --upgrade || true
 
 # Install Poetry (NO pipx)
 if ! sudo -u "$DEPLOY_USER" command -v poetry >/dev/null 2>&1; then
@@ -79,7 +79,7 @@ fi
 # ================================
 # SYSTEMD
 # ================================
-cat > "/etc/systemd/system/${APP_NAME}.service" <<EOF
+sudo tee "/etc/systemd/system/${APP_NAME}.service" > /dev/null <<EOF
 [Unit]
 Description=${APP_NAME}
 After=network.target
@@ -102,16 +102,16 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable "${APP_NAME}"
-systemctl restart "${APP_NAME}"
+sudo systemctl daemon-reload
+sudo systemctl enable "${APP_NAME}"
+sudo systemctl restart "${APP_NAME}"
 
 # ================================
 # NGINX
 # ================================
 echo "🌐 Generating nginx config"
 
-cat > "/etc/nginx/sites-available/${DOMAIN}" <<EOF
+sudo tee "/etc/nginx/sites-available/${DOMAIN}" > /dev/null <<EOF
 server {
   listen 80;
   server_name ${DOMAIN};
@@ -127,9 +127,9 @@ server {
 }
 EOF
 
-ln -sf "/etc/nginx/sites-available/${DOMAIN}" "/etc/nginx/sites-enabled/${DOMAIN}"
+sudo ln -sf "/etc/nginx/sites-available/${DOMAIN}" "/etc/nginx/sites-enabled/${DOMAIN}"
 
-nginx -t
-systemctl reload nginx
+sudo nginx -t
+sudo systemctl reload nginx
 
 echo "✅ App created successfully"
