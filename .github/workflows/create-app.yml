@@ -34,8 +34,13 @@ jobs:
             sudo chown ubuntu:ubuntu "$SECRET_PATH"
             sudo chmod 600 "$SECRET_PATH"
 
-            echo "➡ Cloning repository"
-            if [ ! -d "$APP_DIR/.git" ]; then
+            if [ -d "$APP_DIR/.git" ]; then
+              echo "➡ Updating existing repository"
+              cd "$APP_DIR"
+              git fetch origin main
+              git reset --hard origin/main
+            else
+              echo "➡ Cloning repository"
               git clone "https://github.com/${GITHUB_REPOSITORY}" "$APP_DIR"
             fi
 

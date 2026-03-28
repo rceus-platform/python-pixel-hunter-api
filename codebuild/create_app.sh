@@ -43,19 +43,16 @@ sudo chmod -R u+rwX,g+rwX "$APP_WORKDIR"
 echo "🔧 Installing Python tooling"
 
 sudo apt-get update -y
-sudo apt-get install -y software-properties-common jq
-sudo add-apt-repository -y ppa:deadsnakes/ppa
-sudo apt-get update -y
-sudo apt-get install -y python3.12 python3.12-venv python3.12-dev python3-pip \
+sudo apt-get install -y jq python3-pip python3-venv python3-dev \
                          chromium-browser chromium-chromedriver xvfb
 
-sudo python3.12 -m ensurepip --upgrade || true
+sudo python3 -m ensurepip --upgrade || true
 
 # Install Poetry (NO pipx)
 POETRY_BIN="/home/$DEPLOY_USER/.local/bin/poetry"
 if ! sudo -u "$DEPLOY_USER" [ -x "$POETRY_BIN" ]; then
   echo "📥 Installing Poetry"
-  sudo -u "$DEPLOY_USER" python3.12 -m pip install --user poetry
+  sudo -u "$DEPLOY_USER" python3 -m pip install --user poetry
 fi
 
 export PATH="/home/$DEPLOY_USER/.local/bin:$PATH"
@@ -64,13 +61,20 @@ export PATH="/home/$DEPLOY_USER/.local/bin:$PATH"
 # RUNTIME SETUP
 # ================================
 if [ "$RUNTIME" = "python" ]; then
-  echo "🐍 Python setup with Poetry (Python 3.12)"
+  echo "🐍 Python setup with Poetry (System Python 3)"
 
   sudo -u "$DEPLOY_USER" "$POETRY_BIN" config virtualenvs.in-project true
 
+  if [ -d ".venv" ]; then
+    if ! .venv/bin/python --version | grep -q "3.10"; then
+      echo "🗑️ Removing incompatible .venv"
+      sudo rm -rf .venv
+    fi
+  fi
+
   if [ ! -d ".venv" ]; then
-    echo "📦 Creating .venv with Python 3.12"
-    sudo -u "$DEPLOY_USER" python3.12 -m venv .venv
+    echo "📦 Creating .venv with System Python"
+    sudo -u "$DEPLOY_USER" python3 -m venv .venv
   fi
 
   echo "📦 Installing dependencies"
