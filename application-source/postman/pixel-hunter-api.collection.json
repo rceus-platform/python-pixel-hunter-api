@@ -1,0 +1,178 @@
+{
+    "info": {
+        "name": "Pixel Hunter API",
+        "_postman_id": "b38b3016-6f74-4f2a-8f17-8adf3f85c001",
+        "description": "Endpoints for health check, image search (direct and streaming), reverse search, and image download.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8000"
+        },
+        {
+            "key": "query",
+            "value": "cyberpunk city 4k wallpaper"
+        },
+        {
+            "key": "imageUrl",
+            "value": "https://example.com/cyberpunk_city_4k_wallpaper.jpg"
+        }
+    ],
+    "item": [
+        {
+            "name": "Health",
+            "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/health"
+            }
+        },
+        {
+            "name": "Search Images",
+            "request": {
+                "method": "GET",
+                "url": {
+                    "raw": "{{baseUrl}}/search?query={{query}}&engines=bing,google&min_width=1920&min_height=1080&four_k_only=false&orientation=any&remove_duplicates=true&limit=20",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "search"
+                    ],
+                    "query": [
+                        {
+                            "key": "query",
+                            "value": "{{query}}"
+                        },
+                        {
+                            "key": "engines",
+                            "value": "bing,google"
+                        },
+                        {
+                            "key": "min_width",
+                            "value": "1920"
+                        },
+                        {
+                            "key": "min_height",
+                            "value": "1080"
+                        },
+                        {
+                            "key": "four_k_only",
+                            "value": "false"
+                        },
+                        {
+                            "key": "orientation",
+                            "value": "any"
+                        },
+                        {
+                            "key": "remove_duplicates",
+                            "value": "true"
+                        },
+                        {
+                            "key": "limit",
+                            "value": "20"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Search Items (Stream)",
+            "request": {
+                "method": "GET",
+                "url": {
+                    "raw": "{{baseUrl}}/search/stream?query={{query}}&engines=bing,google&limit=50&allow_unverified=true",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "search",
+                        "stream"
+                    ],
+                    "query": [
+                        {
+                            "key": "query",
+                            "value": "{{query}}"
+                        },
+                        {
+                            "key": "engines",
+                            "value": "bing,google"
+                        },
+                        {
+                            "key": "limit",
+                            "value": "50"
+                        },
+                        {
+                            "key": "allow_unverified",
+                            "value": "true"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Stop Search Stream",
+            "request": {
+                "method": "POST",
+                "url": {
+                    "raw": "{{baseUrl}}/search/stream/stop",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "search",
+                        "stream",
+                        "stop"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Reverse Search (Yandex)",
+            "request": {
+                "method": "GET",
+                "url": {
+                    "raw": "{{baseUrl}}/reverse-search/yandex?image_url={{imageUrl}}&limit=20",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "reverse-search",
+                        "yandex"
+                    ],
+                    "query": [
+                        {
+                            "key": "image_url",
+                            "value": "{{imageUrl}}"
+                        },
+                        {
+                            "key": "limit",
+                            "value": "20"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Download Image",
+            "request": {
+                "method": "GET",
+                "url": {
+                    "raw": "{{baseUrl}}/download?url={{imageUrl}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "download"
+                    ],
+                    "query": [
+                        {
+                            "key": "url",
+                            "value": "{{imageUrl}}"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,74 @@
+name: Deploy App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy latest code
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          envs: GITHUB_REPOSITORY,APP_SECRET_JSON_B64
+          script: |
+            set -e
+
+            APP_NAME="$(basename $GITHUB_REPOSITORY)"
+            APP_DIR="/opt/apps/$APP_NAME"
+            SERVICE_NAME=$APP_NAME.service
+            QCLUSTER_SERVICE_NAME=$APP_NAME-qcluster.service
+            MANIFEST=$APP_DIR/codebuild/app.manifest.json
+            SECRET_PATH="/opt/secrets/${APP_NAME}.json"
+
+            echo "➡ Injecting secrets for $APP_NAME"
+            sudo mkdir -p /opt/secrets
+            echo "$APP_SECRET_JSON_B64" \
+              | base64 --decode \
+              | sudo tee "$SECRET_PATH" > /dev/null
+            sudo chown ubuntu:ubuntu "$SECRET_PATH"
+            sudo chmod 600 "$SECRET_PATH"
+
+            echo "➡ Deploying $APP_NAME"
+
+            cd $APP_DIR
+
+            echo "🧹 Cleaning untracked files"
+            git clean -fd
+            git stash
+
+            echo "📥 Pulling code"
+            git pull origin main
+
+            if [ ! -f "$MANIFEST" ]; then
+              echo "❌ Missing manifest: $MANIFEST"
+              exit 1
+            fi
+
+            WORKDIR=$(jq -r '.working_dir' "$MANIFEST")
+            APP_WORKDIR="$APP_DIR/$WORKDIR"
+            export PATH="$PATH:/home/ubuntu/.local/bin"
+
+            echo "📦 Installing dependencies"
+            sudo -u ubuntu poetry install --no-root --no-interaction
+
+            echo "🔁 Restarting service"
+            sudo systemctl daemon-reload
+            sudo systemctl restart $SERVICE_NAME
+
+            echo "🌐 Reloading nginx"
+            sudo systemctl reload nginx
+
+            echo "🩺 Verifying service"
+            sleep 2
+            sudo systemctl is-active --quiet $SERVICE_NAME
+
+            echo "✅ Deploy completed successfully"
+        env:
+          APP_SECRET_JSON_B64: ${{ secrets.APP_SECRET_JSON_B64 }}
