@@ -58,8 +58,9 @@ jobs:
             echo "📦 Installing dependencies"
             cd "$APP_WORKDIR"
 
+            POETRY_BIN="/home/ubuntu/.local/bin/poetry"
             if [ ! -d ".venv" ]; then
-              sudo -u ubuntu poetry install --no-root --no-interaction
+              sudo -u ubuntu "$POETRY_BIN" install --no-root --no-interaction
             else
               echo "⚡ Using existing .venv"
             fi
