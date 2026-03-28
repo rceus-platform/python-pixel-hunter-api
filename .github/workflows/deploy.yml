@@ -53,10 +53,16 @@ jobs:
 
             WORKDIR=$(jq -r '.working_dir' "$MANIFEST")
             APP_WORKDIR="$APP_DIR/$WORKDIR"
-            export PATH="$PATH:/home/ubuntu/.local/bin"
+            export PATH="/home/ubuntu/.local/bin:$PATH"
 
             echo "📦 Installing dependencies"
-            sudo -u ubuntu poetry install --no-root --no-interaction
+            cd "$APP_WORKDIR"
+
+            if [ ! -d ".venv" ]; then
+              sudo -u ubuntu poetry install --no-root --no-interaction
+            else
+              echo "⚡ Using existing .venv"
+            fi
 
             echo "🔁 Restarting service"
             sudo systemctl daemon-reload

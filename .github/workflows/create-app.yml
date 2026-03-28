@@ -48,6 +48,6 @@ jobs:
             export APP_NAME
             export APP_SECRET_PATH="$SECRET_PATH"
 
-            sudo -E bash codebuild/create_app.sh
+            bash codebuild/create_app.sh
         env:
           APP_SECRET_JSON_B64: ${{ secrets.APP_SECRET_JSON_B64 }}
