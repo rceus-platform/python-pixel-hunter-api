@@ -16,7 +16,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
-          envs: GITHUB_REPOSITORY,APP_SECRET_JSON_B64
+          envs: GITHUB_REPOSITORY,APP_SECRET_JSON_B64,SITE_PASSCODE
           script: |
             set -e
 
@@ -46,41 +46,13 @@ jobs:
             echo "📥 Pulling code"
             git pull origin main
 
-            if [ ! -f "$MANIFEST" ]; then
-              echo "❌ Missing manifest: $MANIFEST"
-              exit 1
-            fi
-
-            WORKDIR=$(jq -r '.working_dir' "$MANIFEST")
-            APP_WORKDIR="$APP_DIR/$WORKDIR"
-            export PATH="/home/ubuntu/.local/bin:$PATH"
-
-            POETRY_BIN="/home/ubuntu/.local/bin/poetry"
-            if [ -d ".venv" ]; then
-              if ! .venv/bin/python --version | grep -q "3.10"; then
-                echo "🗑️ Removing incompatible .venv"
-                sudo rm -rf .venv
-              fi
-            fi
-
-            if [ ! -d ".venv" ]; then
-              echo "📦 Creating .venv with System Python"
-              sudo -u ubuntu python3 -m venv .venv
-            fi
-            echo "📦 Installing dependencies"
-            sudo -u ubuntu "$POETRY_BIN" install --no-root --no-interaction
-
-            echo "🔁 Restarting service"
-            sudo systemctl daemon-reload
-            sudo systemctl restart $SERVICE_NAME
-
-            echo "🌐 Reloading nginx"
-            sudo systemctl reload nginx
-
-            echo "🩺 Verifying service"
-            sleep 2
-            sudo systemctl is-active --quiet $SERVICE_NAME
+            echo "➡ Handover to standardized create_app.sh"
+            export APP_NAME
+            export APP_SECRET_PATH="$SECRET_PATH"
+            # create_app.sh handles .env, runtime setup, systemd, and nginx
+            sudo -E bash codebuild/create_app.sh
 
             echo "✅ Deploy completed successfully"
         env:
           APP_SECRET_JSON_B64: ${{ secrets.APP_SECRET_JSON_B64 }}
+          SITE_PASSCODE: ${{ secrets.SITE_PASSCODE }}

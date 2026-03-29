@@ -49,6 +49,33 @@ sudo chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_WORKDIR"
 sudo chmod -R u+rwX,g+rwX "$APP_WORKDIR"
 
 # ================================
+# UNIVERSAL .ENV GENERATION
+# ================================
+echo "🔐 Generating .env file from manifest"
+ENV_FILE="$APP_WORKDIR/.env"
+
+# Use a temporary file for atomic write and better permission handling
+TMP_ENV=$(mktemp)
+# If env_vars is null or empty, jq returns nothing
+ENV_VARS=$(jq -r '.env_vars // [] | .[]' "$MANIFEST")
+
+for VAR in $ENV_VARS; do
+    # Use Bash indirect expansion to get value of variable named $VAR
+    VAL="${!VAR:-}"
+    if [ -n "$VAL" ]; then
+        echo "${VAR}=${VAL}" >> "$TMP_ENV"
+    else
+        echo "⚠️  Warning: $VAR is in manifest but not set in environment"
+    fi
+done
+
+sudo -u "$DEPLOY_USER" cp "$TMP_ENV" "$ENV_FILE"
+sudo chmod 600 "$ENV_FILE"
+rm "$TMP_ENV"
+
+echo "  ✅ .env written with $(wc -l < "$ENV_FILE") variable(s)"
+
+# ================================
 # OS DEPENDENCIES
 # ================================
 echo "🔧 Installing OS dependencies"
@@ -164,19 +191,6 @@ elif [ "$RUNTIME" = "react" ]; then
     sudo apt-get install -y nodejs
   fi
 
-  # Environment variable injection from manifest
-  echo "📦 Preparing .env for build"
-  sudo -u "$DEPLOY_USER" rm -f .env
-  ENV_VARS=$(jq -r '.env_vars // [] | .[]' "$MANIFEST")
-  if [ -n "$ENV_VARS" ] && [ -f "$APP_SECRET_PATH" ]; then
-    for var in $ENV_VARS; do
-      val=$(jq -r ".$var // empty" "$APP_SECRET_PATH")
-      if [ -n "$val" ]; then
-        echo "$var=$val" | sudo -u "$DEPLOY_USER" tee -a .env > /dev/null
-      fi
-    done
-  fi
-
   echo "📦 Installing NPM dependencies"
   sudo -u "$DEPLOY_USER" npm install
 
@@ -200,6 +214,7 @@ WorkingDirectory=${APP_WORKDIR}
 UMask=0002
 
 $(if [ -n "$APP_SECRET_PATH" ]; then echo "Environment=APP_SECRET_JSON=${APP_SECRET_PATH}"; fi)
+EnvironmentFile=-${APP_WORKDIR}/.env
 Environment=PYTHONPATH=${APP_WORKDIR}
 Environment=PATH=/home/ubuntu/.local/bin:/usr/bin:/bin
 
@@ -269,3 +284,4 @@ sudo nginx -t
 sudo systemctl reload nginx
 
 echo "✅ App created/updated successfully"
+echo "🌐 URL: http://${DOMAIN}"

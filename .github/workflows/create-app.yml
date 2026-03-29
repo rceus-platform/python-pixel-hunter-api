@@ -14,7 +14,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
-          envs: GITHUB_REPOSITORY,APP_SECRET_JSON_B64
+          envs: GITHUB_REPOSITORY,APP_SECRET_JSON_B64,SITE_PASSCODE
           script: |
             set -e
 
@@ -56,3 +56,4 @@ jobs:
             sudo -E bash codebuild/create_app.sh
         env:
           APP_SECRET_JSON_B64: ${{ secrets.APP_SECRET_JSON_B64 }}
+          SITE_PASSCODE: ${{ secrets.SITE_PASSCODE }}
