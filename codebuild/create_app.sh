@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ================================
+# REQUIRED ENV
+# ================================
 APP_NAME="${APP_NAME:?APP_NAME not set}"
-APP_SECRET_PATH="${APP_SECRET_PATH:?APP_SECRET_PATH not set}"
+# APP_SECRET_PATH may be optional for some apps, but we'll default to an empty string if not provided
+APP_SECRET_PATH="${APP_SECRET_PATH:-}"
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY not set}"
 
+# ================================
+# CONSTANTS
+# ================================
 BASE_DIR="/opt/apps"
 APP_DIR="$BASE_DIR/$APP_NAME"
 MANIFEST="$APP_DIR/codebuild/app.manifest.json"
@@ -14,6 +21,9 @@ echo "➡ Creating app: $APP_NAME"
 
 cd "$APP_DIR"
 
+# ================================
+# READ MANIFEST
+# ================================
 if [ ! -f "$MANIFEST" ]; then
   echo "❌ Missing codebuild/app.manifest.json"
   exit 1
@@ -34,6 +44,7 @@ fi
 
 cd "$APP_WORKDIR"
 
+# Ensure correct permissions
 sudo chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_WORKDIR"
 sudo chmod -R u+rwX,g+rwX "$APP_WORKDIR"
 
@@ -52,9 +63,16 @@ install_if_missing() {
   fi
 }
 
-# Only update apt if we need to install something new
+# Define dependencies for ALL runtimes
+CORE_PKGS="jq curl ca-certificates nginx build-essential clang openssl"
+# Browsing/Scraping dependencies (Universal)
+BROWSER_PKGS="chromium-browser chromium-chromedriver xvfb"
+# Python Specific (needed for build/setup)
+PYTHON_PKGS="python3-pip python3-venv python3-dev"
+
+# Check if we need to update apt
 NEED_UPDATE=false
-for pkg in jq python3-pip python3-venv python3-dev build-essential clang curl ca-certificates chromium-browser chromium-chromedriver xvfb; do
+for pkg in $CORE_PKGS $BROWSER_PKGS $PYTHON_PKGS; do
   if ! dpkg -l "$pkg" &>/dev/null; then
     NEED_UPDATE=true
     break
@@ -66,36 +84,46 @@ if [ "$NEED_UPDATE" = true ]; then
   sudo apt-get update -y
 fi
 
-for pkg in jq python3-pip python3-venv python3-dev build-essential clang curl ca-certificates chromium-browser chromium-chromedriver xvfb; do
+# Install all dependencies
+for pkg in $CORE_PKGS $BROWSER_PKGS $PYTHON_PKGS; do
   install_if_missing "$pkg"
 done
 
 # ================================
-# PYTHON TOOLING
+# SSL PROVISIONING
 # ================================
-echo "🔧 Setting up Python tooling"
-
-# Use standard python3 (default on Ubuntu 24.04 is 3.12)
-PYTHON_BIN=$(which python3)
-POETRY_BIN="/home/$DEPLOY_USER/.local/bin/poetry"
-
-if ! sudo -u "$DEPLOY_USER" [ -x "$POETRY_BIN" ] || ! sudo -u "$DEPLOY_USER" "$POETRY_BIN" --version &>/dev/null; then
-  echo "📥 Installing/Repairing Poetry using $PYTHON_BIN"
-  curl -sSL https://install.python-poetry.org | sudo -u "$DEPLOY_USER" "$PYTHON_BIN" -
+echo "🔐 Checking SSL certificates"
+SSL_DIR="/etc/nginx/ssl"
+if [ ! -f "$SSL_DIR/self.crt" ]; then
+  echo "🎁 Generating self-signed certificate"
+  sudo mkdir -p "$SSL_DIR"
+  sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout "$SSL_DIR/self.key" -out "$SSL_DIR/self.crt" \
+    -subj "/C=US/ST=State/L=City/O=Organization/CN=${DOMAIN}"
 fi
 
-export PATH="/home/$DEPLOY_USER/.local/bin:$PATH"
-
 # ================================
-# RUNTIME SETUP
+# RUNTIME SETUP (Python)
 # ================================
 if [ "$RUNTIME" = "python" ]; then
-  echo "🐍 Python setup with Poetry ($PYTHON_BIN)"
+  echo "🐍 Python setup with Poetry"
 
+  PYTHON_BIN=$(which python3)
+  POETRY_BIN="/home/$DEPLOY_USER/.local/bin/poetry"
+
+  # Install/Repair Poetry
+  if ! sudo -u "$DEPLOY_USER" [ -x "$POETRY_BIN" ] || ! sudo -u "$DEPLOY_USER" "$POETRY_BIN" --version &>/dev/null; then
+    echo "📥 Installing/Repairing Poetry using $PYTHON_BIN"
+    curl -sSL https://install.python-poetry.org | sudo -u "$DEPLOY_USER" "$PYTHON_BIN" -
+  fi
+
+  export PATH="/home/$DEPLOY_USER/.local/bin:$PATH"
+
+  # Configure Poetry
   sudo -u "$DEPLOY_USER" "$POETRY_BIN" config virtualenvs.in-project true
 
+  # Handle .venv compatibility
   if [ -d ".venv" ]; then
-    # Remove incompatible .venv if needed
     CUR_V=$( .venv/bin/python --version | awk '{print $2}' | cut -d. -f1,2 )
     SYS_V=$( "$PYTHON_BIN" --version | awk '{print $2}' | cut -d. -f1,2 )
     if [ "$CUR_V" != "$SYS_V" ]; then
@@ -109,19 +137,59 @@ if [ "$RUNTIME" = "python" ]; then
     sudo -u "$DEPLOY_USER" "$PYTHON_BIN" -m venv .venv
   fi
 
-  echo "📦 Installing dependencies"
+  echo "📦 Installing Python dependencies"
   sudo -u "$DEPLOY_USER" "$POETRY_BIN" install --no-root --no-interaction
 
   if [ ! -d ".venv" ]; then
     echo "❌ .venv not created"
     exit 1
   fi
+
+# ================================
+# RUNTIME SETUP (React)
+# ================================
+elif [ "$RUNTIME" = "react" ]; then
+  echo "⚛️ React setup with NPM"
+
+  # Check if Node.js is missing or below version 20
+  if command -v node &> /dev/null; then
+    NODE_MAJOR_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+  else
+    NODE_MAJOR_VERSION=0
+  fi
+
+  if [ "$NODE_MAJOR_VERSION" -lt 20 ]; then
+    echo "📥 Installing/Upgrading Node.js to version 20.x (Current: v$NODE_MAJOR_VERSION)"
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+  fi
+
+  # Environment variable injection from manifest
+  echo "📦 Preparing .env for build"
+  sudo -u "$DEPLOY_USER" rm -f .env
+  ENV_VARS=$(jq -r '.env_vars // [] | .[]' "$MANIFEST")
+  if [ -n "$ENV_VARS" ] && [ -f "$APP_SECRET_PATH" ]; then
+    for var in $ENV_VARS; do
+      val=$(jq -r ".$var // empty" "$APP_SECRET_PATH")
+      if [ -n "$val" ]; then
+        echo "$var=$val" | sudo -u "$DEPLOY_USER" tee -a .env > /dev/null
+      fi
+    done
+  fi
+
+  echo "📦 Installing NPM dependencies"
+  sudo -u "$DEPLOY_USER" npm install
+
+  echo "🏗️ Building React application"
+  sudo -u "$DEPLOY_USER" npm run build
 fi
 
 # ================================
-# SYSTEMD
+# SYSTEMD (Only for persistent services)
 # ================================
-sudo tee "/etc/systemd/system/${APP_NAME}.service" > /dev/null <<EOF
+if [ "$RUNTIME" = "python" ]; then
+  echo "🔧 Creating systemd service"
+  sudo tee "/etc/systemd/system/${APP_NAME}.service" > /dev/null <<EOF
 [Unit]
 Description=${APP_NAME}
 After=network.target
@@ -131,7 +199,7 @@ User=ubuntu
 WorkingDirectory=${APP_WORKDIR}
 UMask=0002
 
-Environment=APP_SECRET_JSON=${APP_SECRET_PATH}
+$(if [ -n "$APP_SECRET_PATH" ]; then echo "Environment=APP_SECRET_JSON=${APP_SECRET_PATH}"; fi)
 Environment=PYTHONPATH=${APP_WORKDIR}
 Environment=PATH=/home/ubuntu/.local/bin:/usr/bin:/bin
 
@@ -144,14 +212,30 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-sudo systemctl daemon-reload
-sudo systemctl enable "${APP_NAME}"
-sudo systemctl restart "${APP_NAME}"
+  sudo systemctl daemon-reload
+  sudo systemctl enable "${APP_NAME}"
+  sudo systemctl restart "${APP_NAME}"
+fi
 
 # ================================
-# NGINX
+# NGINX CONFIGURATION
 # ================================
-echo "🌐 Generating nginx config"
+echo "🌐 Generating nginx config for $DOMAIN"
+
+if [ "$RUNTIME" = "react" ]; then
+  # React: Serve static files from /dist
+  LOCATION_CONFIG="    root ${APP_WORKDIR}/dist;
+    index index.html;
+    try_files \$uri \$uri/ /index.html;"
+else
+  # Python: Proxy to the local port
+  LOCATION_CONFIG="    proxy_pass http://127.0.0.1:${PORT};
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;"
+fi
 
 sudo tee "/etc/nginx/sites-available/${DOMAIN}" > /dev/null <<EOF
 server {
@@ -159,12 +243,22 @@ server {
   server_name ${DOMAIN};
 
   location / {
-    proxy_pass http://127.0.0.1:${PORT};
-    proxy_http_version 1.1;
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
+${LOCATION_CONFIG}
+  }
+}
+
+server {
+  listen 443 ssl;
+  server_name ${DOMAIN};
+
+  ssl_certificate /etc/nginx/ssl/self.crt;
+  ssl_certificate_key /etc/nginx/ssl/self.key;
+
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_ciphers HIGH:!aNULL:!MD5;
+
+  location / {
+${LOCATION_CONFIG}
   }
 }
 EOF
@@ -174,4 +268,4 @@ sudo ln -sf "/etc/nginx/sites-available/${DOMAIN}" "/etc/nginx/sites-enabled/${D
 sudo nginx -t
 sudo systemctl reload nginx
 
-echo "✅ App created successfully"
+echo "✅ App created/updated successfully"
