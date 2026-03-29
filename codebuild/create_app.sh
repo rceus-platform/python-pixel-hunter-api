@@ -19,6 +19,47 @@ DEPLOY_USER="ubuntu"
 
 echo "➡ Creating app: $APP_NAME"
 
+# ================================
+# OS DEPENDENCIES (Ensures jq is available)
+# ================================
+echo "🔧 Installing OS dependencies"
+
+install_if_missing() {
+  local PKG=$1
+  if ! dpkg -l "$PKG" &>/dev/null; then
+    echo "📦 Installing $PKG..."
+    sudo apt-get install -y "$PKG"
+  else
+    echo "✅ $PKG is already installed"
+  fi
+}
+
+# Define dependencies for ALL runtimes
+CORE_PKGS="jq curl ca-certificates nginx build-essential clang openssl"
+# Browsing/Scraping dependencies (Universal)
+BROWSER_PKGS="chromium-browser chromium-chromedriver xvfb"
+# Python Specific (needed for build/setup)
+PYTHON_PKGS="python3-pip python3-venv python3-dev"
+
+# Check if we need to update apt
+NEED_UPDATE=false
+for pkg in $CORE_PKGS $BROWSER_PKGS $PYTHON_PKGS; do
+  if ! dpkg -l "$pkg" &>/dev/null; then
+    NEED_UPDATE=true
+    break
+  fi
+done
+
+if [ "$NEED_UPDATE" = true ]; then
+  echo "⬆ Updating apt-get"
+  sudo apt-get update -y
+fi
+
+# Install all dependencies
+for pkg in $CORE_PKGS $BROWSER_PKGS $PYTHON_PKGS; do
+  install_if_missing "$pkg"
+done
+
 cd "$APP_DIR"
 
 # ================================
@@ -69,52 +110,12 @@ for VAR in $ENV_VARS; do
     fi
 done
 
-sudo -u "$DEPLOY_USER" cp "$TMP_ENV" "$ENV_FILE"
+sudo cp "$TMP_ENV" "$ENV_FILE"
+sudo chown "$DEPLOY_USER:$DEPLOY_USER" "$ENV_FILE"
 sudo chmod 600 "$ENV_FILE"
-rm "$TMP_ENV"
+rm -f "$TMP_ENV"
 
 echo "  ✅ .env written with $(wc -l < "$ENV_FILE") variable(s)"
-
-# ================================
-# OS DEPENDENCIES
-# ================================
-echo "🔧 Installing OS dependencies"
-
-install_if_missing() {
-  local PKG=$1
-  if ! dpkg -l "$PKG" &>/dev/null; then
-    echo "📦 Installing $PKG..."
-    sudo apt-get install -y "$PKG"
-  else
-    echo "✅ $PKG is already installed"
-  fi
-}
-
-# Define dependencies for ALL runtimes
-CORE_PKGS="jq curl ca-certificates nginx build-essential clang openssl"
-# Browsing/Scraping dependencies (Universal)
-BROWSER_PKGS="chromium-browser chromium-chromedriver xvfb"
-# Python Specific (needed for build/setup)
-PYTHON_PKGS="python3-pip python3-venv python3-dev"
-
-# Check if we need to update apt
-NEED_UPDATE=false
-for pkg in $CORE_PKGS $BROWSER_PKGS $PYTHON_PKGS; do
-  if ! dpkg -l "$pkg" &>/dev/null; then
-    NEED_UPDATE=true
-    break
-  fi
-done
-
-if [ "$NEED_UPDATE" = true ]; then
-  echo "⬆ Updating apt-get"
-  sudo apt-get update -y
-fi
-
-# Install all dependencies
-for pkg in $CORE_PKGS $BROWSER_PKGS $PYTHON_PKGS; do
-  install_if_missing "$pkg"
-done
 
 # ================================
 # SSL PROVISIONING
