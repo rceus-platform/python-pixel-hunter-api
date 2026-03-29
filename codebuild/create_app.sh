@@ -38,25 +38,46 @@ sudo chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_WORKDIR"
 sudo chmod -R u+rwX,g+rwX "$APP_WORKDIR"
 
 # ================================
+# OS DEPENDENCIES
+# ================================
+echo "🔧 Installing OS dependencies"
+
+install_if_missing() {
+  local PKG=$1
+  if ! dpkg -l "$PKG" &>/dev/null; then
+    echo "📦 Installing $PKG..."
+    sudo apt-get install -y "$PKG"
+  else
+    echo "✅ $PKG is already installed"
+  fi
+}
+
+# Only update apt if we need to install something new
+NEED_UPDATE=false
+for pkg in jq python3-pip python3-venv python3-dev build-essential clang curl ca-certificates chromium-browser chromium-chromedriver xvfb; do
+  if ! dpkg -l "$pkg" &>/dev/null; then
+    NEED_UPDATE=true
+    break
+  fi
+done
+
+if [ "$NEED_UPDATE" = true ]; then
+  echo "⬆ Updating apt-get"
+  sudo apt-get update -y
+fi
+
+for pkg in jq python3-pip python3-venv python3-dev build-essential clang curl ca-certificates chromium-browser chromium-chromedriver xvfb; do
+  install_if_missing "$pkg"
+done
+
+# ================================
 # PYTHON TOOLING
 # ================================
-echo "🔧 Installing Python tooling"
+echo "🔧 Setting up Python tooling"
 
-sudo apt-get update -y
-sudo apt-get install -y jq python3-pip python3-venv python3-dev \
-                         build-essential clang \
-                         curl ca-certificates \
-                         chromium-browser chromium-chromedriver xvfb
-
-# Install or repair Poetry (Official Installer)
-# Note: official script installs into /home/ubuntu/.local/bin/poetry by default
+# Use standard python3 (default on Ubuntu 24.04 is 3.12)
+PYTHON_BIN=$(which python3)
 POETRY_BIN="/home/$DEPLOY_USER/.local/bin/poetry"
-PYTHON_BIN="/opt/python3.14/bin/python"
-
-if [ ! -f "$PYTHON_BIN" ]; then
-  echo "⚠️ $PYTHON_BIN not found, falling back to system python3"
-  PYTHON_BIN="python3"
-fi
 
 if ! sudo -u "$DEPLOY_USER" [ -x "$POETRY_BIN" ] || ! sudo -u "$DEPLOY_USER" "$POETRY_BIN" --version &>/dev/null; then
   echo "📥 Installing/Repairing Poetry using $PYTHON_BIN"
@@ -74,8 +95,11 @@ if [ "$RUNTIME" = "python" ]; then
   sudo -u "$DEPLOY_USER" "$POETRY_BIN" config virtualenvs.in-project true
 
   if [ -d ".venv" ]; then
-    if ! .venv/bin/python --version | grep -q "3.14"; then
-      echo "🗑️ Removing incompatible .venv"
+    # Remove incompatible .venv if needed
+    CUR_V=$( .venv/bin/python --version | awk '{print $2}' | cut -d. -f1,2 )
+    SYS_V=$( "$PYTHON_BIN" --version | awk '{print $2}' | cut -d. -f1,2 )
+    if [ "$CUR_V" != "$SYS_V" ]; then
+      echo "🗑️ Removing incompatible .venv ($CUR_V vs $SYS_V)"
       sudo rm -rf .venv
     fi
   fi

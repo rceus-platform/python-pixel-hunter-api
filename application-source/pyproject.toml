@@ -7,7 +7,7 @@ license = "MIT"
 packages = [{ include = "app" }]
 
 [tool.poetry.dependencies]
-python = ">=3.14,<4.0"
+python = "^3.12"
 fastapi = "0.116.1"
 uvicorn = "0.35.0"
 httpx = "0.28.1"
