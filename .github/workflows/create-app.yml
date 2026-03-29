@@ -9,7 +9,7 @@ jobs:
 
     steps:
       - name: Provision app + secrets on VM
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}

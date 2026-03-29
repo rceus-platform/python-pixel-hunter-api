@@ -15,6 +15,7 @@ GITHUB_REPOSITORY="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY not set}"
 BASE_DIR="/opt/apps"
 APP_DIR="$BASE_DIR/$APP_NAME"
 MANIFEST="$APP_DIR/codebuild/app.manifest.json"
+PACKAGES_FILE="$APP_DIR/codebuild/packages.json"
 DEPLOY_USER="ubuntu"
 
 echo "➡ Creating app: $APP_NAME"
@@ -34,12 +35,15 @@ install_if_missing() {
   fi
 }
 
-# Define dependencies for ALL runtimes
-CORE_PKGS="jq curl ca-certificates nginx build-essential clang openssl"
-# Browsing/Scraping dependencies (Universal)
-BROWSER_PKGS="chromium-browser chromium-chromedriver xvfb"
-# Python Specific (needed for build/setup)
-PYTHON_PKGS="python3-pip python3-venv python3-dev"
+if [ ! -f "$PACKAGES_FILE" ]; then
+  echo "❌ Missing codebuild/packages.json"
+  exit 1
+fi
+
+# Read packages from config
+CORE_PKGS=$(jq -r '.core | join(" ")' "$PACKAGES_FILE")
+BROWSER_PKGS=$(jq -r '.browser | join(" ")' "$PACKAGES_FILE")
+PYTHON_PKGS=$(jq -r '.python | join(" ")' "$PACKAGES_FILE")
 
 # Check if we need to update apt
 NEED_UPDATE=false
@@ -75,6 +79,10 @@ WORKDIR=$(jq -r '.working_dir' "$MANIFEST")
 START_CMD=$(jq -r '.start_command' "$MANIFEST")
 PORT=$(jq -r '.port' "$MANIFEST")
 DOMAIN=$(jq -r '.domain' "$MANIFEST")
+TIMEZONE=$(jq -r '.timezone // "Asia/Kolkata"' "$MANIFEST")
+
+echo "🕒 Setting system timezone to $TIMEZONE"
+sudo timedatectl set-timezone "$TIMEZONE" || echo "⚠️  Warning: Could not set system timezone"
 
 APP_WORKDIR="$APP_DIR/$WORKDIR"
 
@@ -173,6 +181,16 @@ if [ "$RUNTIME" = "python" ]; then
     exit 1
   fi
 
+  if [ -f "manage.py" ]; then
+    echo "🗄️ Django app detected. Running migrations..."
+    sudo -u "$DEPLOY_USER" .venv/bin/python manage.py migrate --noinput
+
+    echo "🎨 Collecting static files..."
+    sudo -u "$DEPLOY_USER" .venv/bin/python manage.py collectstatic --noinput
+  else
+    echo "ℹ️ No manage.py found. Skipping Django-specific steps."
+  fi
+
 # ================================
 # RUNTIME SETUP (React)
 # ================================
@@ -216,6 +234,7 @@ UMask=0002
 
 $(if [ -n "$APP_SECRET_PATH" ]; then echo "Environment=APP_SECRET_JSON=${APP_SECRET_PATH}"; fi)
 EnvironmentFile=-${APP_WORKDIR}/.env
+Environment=TZ=${TIMEZONE}
 Environment=PYTHONPATH=${APP_WORKDIR}
 Environment=PATH=/home/ubuntu/.local/bin:/usr/bin:/bin
 
@@ -240,17 +259,35 @@ echo "🌐 Generating nginx config for $DOMAIN"
 
 if [ "$RUNTIME" = "react" ]; then
   # React: Serve static files from /dist
-  LOCATION_CONFIG="    root ${APP_WORKDIR}/dist;
+  NGINX_LOCATIONS="
+  location / {
+    root ${APP_WORKDIR}/dist;
     index index.html;
-    try_files \$uri \$uri/ /index.html;"
+    try_files \$uri \$uri/ /index.html;
+  }"
 else
-  # Python: Proxy to the local port
-  LOCATION_CONFIG="    proxy_pass http://127.0.0.1:${PORT};
+  # Python: Proxy to the local port + static/media
+  NGINX_LOCATIONS="
+  location /static/ {
+    alias ${APP_WORKDIR}/staticfiles/;
+    expires 30d;
+    add_header Cache-Control \"public, max-age=2592000\";
+  }
+
+  location /media/ {
+    alias ${APP_WORKDIR}/media/;
+    expires 30d;
+    add_header Cache-Control \"public, max-age=2592000\";
+  }
+
+  location / {
+    proxy_pass http://127.0.0.1:${PORT};
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;"
+    proxy_set_header X-Forwarded-Proto \$scheme;
+  }"
 fi
 
 sudo tee "/etc/nginx/sites-available/${DOMAIN}" > /dev/null <<EOF
@@ -258,9 +295,7 @@ server {
   listen 80;
   server_name ${DOMAIN};
 
-  location / {
-${LOCATION_CONFIG}
-  }
+  ${NGINX_LOCATIONS}
 }
 
 server {
@@ -273,9 +308,7 @@ server {
   ssl_protocols TLSv1.2 TLSv1.3;
   ssl_ciphers HIGH:!aNULL:!MD5;
 
-  location / {
-${LOCATION_CONFIG}
-  }
+  ${NGINX_LOCATIONS}
 }
 EOF
 

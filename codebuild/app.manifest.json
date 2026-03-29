@@ -4,6 +4,7 @@
   "start_command": ".venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8005",
   "port": 8005,
   "domain": "pixel-hunter-api.rceus.duckdns.org",
+  "timezone": "Asia/Kolkata",
   "env_vars": [
     "SITE_PASSCODE"
   ]

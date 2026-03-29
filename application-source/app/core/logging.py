@@ -85,7 +85,8 @@ def configure_logging() -> None:
     if log_format == "text":
         handler.setFormatter(
             logging.Formatter(
-                "%(asctime)s | %(levelname)s | %(name)s | %(message)s | request_id=%(request_id)s"
+                "%(asctime)s | %(levelname)s | %(name)s | %(message)s | request_id=%(request_id)s",
+                datefmt="%Y-%m-%d %H:%M:%S%z",
             )
         )
     else:

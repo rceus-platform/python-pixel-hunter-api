@@ -1,0 +1,22 @@
+{
+  "core": [
+    "jq",
+    "curl",
+    "ca-certificates",
+    "nginx",
+    "build-essential",
+    "clang",
+    "openssl",
+    "ffmpeg"
+  ],
+  "browser": [
+    "chromium-browser",
+    "chromium-chromedriver",
+    "xvfb"
+  ],
+  "python": [
+    "python3-pip",
+    "python3-venv",
+    "python3-dev"
+  ]
+}
