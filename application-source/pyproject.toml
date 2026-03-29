@@ -7,7 +7,7 @@ license = "MIT"
 packages = [{ include = "app" }]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<4.0"
+python = ">=3.14,<4.0"
 fastapi = "0.116.1"
 uvicorn = "0.35.0"
 httpx = "0.28.1"
@@ -19,10 +19,7 @@ pillow = "11.3.0"
 pytest-asyncio = ">=0.23.5"
 
 [dependency-groups]
-dev = [
-    "pytest (>=8.4.2,<9.0.0)",
-    "pytest-asyncio (>=0.23.5)",
-]
+dev = ["pytest (>=8.4.2,<9.0.0)", "pytest-asyncio (>=0.23.5)"]
 
 [build-system]
 requires = ["poetry-core>=1.5.0"]
