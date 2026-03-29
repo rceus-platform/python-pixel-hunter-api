@@ -44,6 +44,7 @@ echo "🔧 Installing Python tooling"
 
 sudo apt-get update -y
 sudo apt-get install -y jq python3-pip python3-venv python3-dev \
+                         build-essential clang \
                          curl ca-certificates \
                          chromium-browser chromium-chromedriver xvfb
 
