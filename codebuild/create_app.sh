@@ -44,15 +44,22 @@ echo "🔧 Installing Python tooling"
 
 sudo apt-get update -y
 sudo apt-get install -y jq python3-pip python3-venv python3-dev \
+                         curl ca-certificates \
                          chromium-browser chromium-chromedriver xvfb
 
-sudo python3 -m ensurepip --upgrade || true
-
-# Install Poetry (NO pipx)
+# Install or repair Poetry (Official Installer)
+# Note: official script installs into /home/ubuntu/.local/bin/poetry by default
 POETRY_BIN="/home/$DEPLOY_USER/.local/bin/poetry"
-if ! sudo -u "$DEPLOY_USER" [ -x "$POETRY_BIN" ]; then
-  echo "📥 Installing Poetry"
-  sudo -u "$DEPLOY_USER" python3 -m pip install --user poetry
+PYTHON_BIN="/opt/python3.14/bin/python"
+
+if [ ! -f "$PYTHON_BIN" ]; then
+  echo "⚠️ $PYTHON_BIN not found, falling back to system python3"
+  PYTHON_BIN="python3"
+fi
+
+if ! sudo -u "$DEPLOY_USER" [ -x "$POETRY_BIN" ] || ! sudo -u "$DEPLOY_USER" "$POETRY_BIN" --version &>/dev/null; then
+  echo "📥 Installing/Repairing Poetry using $PYTHON_BIN"
+  curl -sSL https://install.python-poetry.org | sudo -u "$DEPLOY_USER" "$PYTHON_BIN" -
 fi
 
 export PATH="/home/$DEPLOY_USER/.local/bin:$PATH"
@@ -61,20 +68,20 @@ export PATH="/home/$DEPLOY_USER/.local/bin:$PATH"
 # RUNTIME SETUP
 # ================================
 if [ "$RUNTIME" = "python" ]; then
-  echo "🐍 Python setup with Poetry (System Python 3)"
+  echo "🐍 Python setup with Poetry ($PYTHON_BIN)"
 
   sudo -u "$DEPLOY_USER" "$POETRY_BIN" config virtualenvs.in-project true
 
   if [ -d ".venv" ]; then
-    if ! .venv/bin/python --version | grep -q "3.10"; then
+    if ! .venv/bin/python --version | grep -q "3.14"; then
       echo "🗑️ Removing incompatible .venv"
       sudo rm -rf .venv
     fi
   fi
 
   if [ ! -d ".venv" ]; then
-    echo "📦 Creating .venv with System Python"
-    sudo -u "$DEPLOY_USER" python3 -m venv .venv
+    echo "📦 Creating .venv with $PYTHON_BIN"
+    sudo -u "$DEPLOY_USER" "$PYTHON_BIN" -m venv .venv
   fi
 
   echo "📦 Installing dependencies"
