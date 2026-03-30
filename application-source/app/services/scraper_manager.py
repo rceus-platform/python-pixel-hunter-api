@@ -4,21 +4,15 @@ import asyncio
 import logging
 import time
 from collections.abc import AsyncIterator
-from typing import Coroutine, List, Optional, Tuple, cast
-from urllib.parse import quote_plus
-
+from typing import Coroutine, List, Optional, Tuple
 import httpx
 from fastapi import HTTPException
 
 from app.core.constants import (
     ENGINE_PAGE_TIMEOUT_SECONDS,
     ENGINE_TOTAL_TIMEOUT_BUDGET_SECONDS,
-    GENERIC_IMAGE_URL_PATTERN,
-    GOOGLE_BARE_IMAGE_URL_PATTERN,
-    MAX_CANDIDATES_PER_ENGINE,
     MAX_STREAM_PAGES,
     MIN_ENGINE_CANDIDATES_BEFORE_BROWSER_FALLBACK,
-    REQUEST_HEADERS,
     STREAM_ENGINE_EMPTY_PAGE_STREAK_LIMIT,
     SUPPORTED_SEARCH_ENGINES,
 )
@@ -39,57 +33,10 @@ from app.utilities.image_utils import (
     meets_dimension_thresholds,
 )
 from app.utilities.url_utils import (
-    is_google_internal_url,
-    normalize_candidate_url,
     query_hash,
     source_from_url,
 )
 
-
-# Re-including this here for now as it's a manager-level fallback
-async def scrape_google_proxy_fallback_urls(
-    query: str, client: httpx.AsyncClient, page: int = 0
-) -> List[str]:
-    """Use a text mirror as a last-resort fallback for blocked Google responses."""
-
-    start = page * 20
-    proxy_target = (
-        "https://www.google.com/search?tbm=isch&gbv=1"
-        f"&hl=en&gl=us&pws=0&q={quote_plus(query)}&start={start}"
-    )
-    proxy_url = f"https://r.jina.ai/http://{proxy_target.removeprefix('https://')}"
-    try:
-        response = await client.get(proxy_url, headers=REQUEST_HEADERS)
-        response.raise_for_status()
-        body = response.text
-    except httpx.HTTPError:
-        return []
-
-    urls: List[str] = []
-    seen: set[str] = set()
-
-    def maybe_add_url(candidate: Optional[str]) -> None:
-        normalized = normalize_candidate_url(candidate)
-        if not normalized:
-            return
-        if is_google_internal_url(normalized):
-            return
-        if normalized not in seen:
-            seen.add(normalized)
-            urls.append(normalized)
-
-    for match in cast(List[str], GENERIC_IMAGE_URL_PATTERN.findall(body)):
-        maybe_add_url(match)
-        if len(urls) >= MAX_CANDIDATES_PER_ENGINE:
-            break
-
-    if len(urls) < MAX_CANDIDATES_PER_ENGINE:
-        for match in cast(List[str], GOOGLE_BARE_IMAGE_URL_PATTERN.findall(body)):
-            maybe_add_url(match)
-            if len(urls) >= MAX_CANDIDATES_PER_ENGINE:
-                break
-
-    return urls
 
 
 async def run_engine_task_with_timeout(

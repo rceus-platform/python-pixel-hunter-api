@@ -190,31 +190,24 @@ if [ "$RUNTIME" = "python" ]; then
   else
     echo "ℹ️ No manage.py found. Skipping Django-specific steps."
   fi
+fi
 
 # ================================
 # RUNTIME SETUP (React)
 # ================================
-elif [ "$RUNTIME" = "react" ]; then
-  echo "⚛️ React setup with NPM"
+if [ "$RUNTIME" = "react" ]; then
+  # If dist/ exists, we assume the app was pre-built (e.g. via GitHub Actions)
+  if [ -d "dist" ] && [ "$(ls -A dist)" ]; then
+    echo "✅ Found pre-built dist/ folder. Skipping build steps to save resources."
+  elif [ -f "package.json" ]; then
+    echo "📦 Installing NPM dependencies"
+    sudo -u "$DEPLOY_USER" npm install
 
-  # Check if Node.js is missing or below version 20
-  if command -v node &> /dev/null; then
-    NODE_MAJOR_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+    echo "🏗️ Building React application"
+    sudo -u "$DEPLOY_USER" npm run build
   else
-    NODE_MAJOR_VERSION=0
+    echo "⚠️ Warning: Runtime is react but no package.json or dist/ found."
   fi
-
-  if [ "$NODE_MAJOR_VERSION" -lt 20 ]; then
-    echo "📥 Installing/Upgrading Node.js to version 20.x (Current: v$NODE_MAJOR_VERSION)"
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-    sudo apt-get install -y nodejs
-  fi
-
-  echo "📦 Installing NPM dependencies"
-  sudo -u "$DEPLOY_USER" npm install
-
-  echo "🏗️ Building React application"
-  sudo -u "$DEPLOY_USER" npm run build
 fi
 
 # ================================

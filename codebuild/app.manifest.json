@@ -1,7 +1,7 @@
 {
   "runtime": "python",
   "working_dir": "application-source",
-  "start_command": ".venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8005",
+  "start_command": ".venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8005 --workers 1",
   "port": 8005,
   "domain": "pixel-hunter-api.rceus.duckdns.org",
   "timezone": "Asia/Kolkata",
