@@ -6,7 +6,7 @@ import logging
 from typing import Annotated, AsyncIterator, List, Optional, Tuple
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.constants import (
@@ -184,6 +184,7 @@ async def search_images(
 
 @router.get("/stream")
 async def search_images_stream(
+    request: Request,
     query: Annotated[str, Query(min_length=1, description="Actress name or keyword")],
     engines: Annotated[
         str,
@@ -269,14 +270,14 @@ async def search_images_stream(
             async for batch in iterate_engine_candidates(
                 cleaned_query, selected_engines, client, pages
             ):
-                if stream_stop_event.is_set():
+                if stream_stop_event.is_set() or (request and await request.is_disconnected()):
                     break
                 for candidate in batch:
                     task = asyncio.create_task(guarded(candidate))
                     pending[task] = candidate
 
                 while pending:
-                    if stream_stop_event.is_set():
+                    if stream_stop_event.is_set() or (request and await request.is_disconnected()):
                         for t in pending:
                             t.cancel()
                         return
@@ -320,7 +321,7 @@ async def search_images_stream(
                     relaxed_pending[asyncio.create_task(guarded(c, relaxed=True))] = c
 
                 while relaxed_pending:
-                    if stream_stop_event.is_set():
+                    if stream_stop_event.is_set() or (request and await request.is_disconnected()):
                         for t in relaxed_pending:
                             t.cancel()
                         return
