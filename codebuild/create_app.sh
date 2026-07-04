@@ -5,7 +5,6 @@ set -euo pipefail
 # REQUIRED ENV
 # ================================
 APP_NAME="${APP_NAME:?APP_NAME not set}"
-# APP_SECRET_PATH may be optional for some apps, but we'll default to an empty string if not provided
 APP_SECRET_PATH="${APP_SECRET_PATH:-}"
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY not set}"
 
@@ -166,71 +165,20 @@ fi
 # RUNTIME SETUP (Python)
 # ================================
 if [ "$RUNTIME" = "python" ]; then
-  PYTHON_BIN=$(which python3)
+  echo "🐍 Python setup with uv"
 
-  # Auto-install uv if missing
-  if ! command -v uv &>/dev/null && [ ! -x "/home/$DEPLOY_USER/.local/bin/uv" ]; then
-    echo "📥 Installing uv..."
-    curl -LsSf https://astral.sh/uv/install.sh | sudo -u "$DEPLOY_USER" sh
+  UV_BIN="/home/$DEPLOY_USER/.local/bin/uv"
+
+  # Install/Repair uv
+  if ! sudo -u "$DEPLOY_USER" [ -x "$UV_BIN" ] || ! sudo -u "$DEPLOY_USER" "$UV_BIN" --version &>/dev/null; then
+    echo "📥 Installing/Repairing uv"
+    curl -LsSf https://astral.sh/uv/install.sh | sudo -u "$DEPLOY_USER" env HOME="/home/$DEPLOY_USER" sh
   fi
 
-  # Detect uv (check path and common install location)
-  if command -v uv &>/dev/null; then
-    USE_UV=true
-    UV_CMD="uv"
-  elif [ -x "/home/$DEPLOY_USER/.local/bin/uv" ]; then
-    USE_UV=true
-    UV_CMD="/home/$DEPLOY_USER/.local/bin/uv"
-  else
-    USE_UV=false
-  fi
+  export PATH="/home/$DEPLOY_USER/.local/bin:$PATH"
 
-  if [ "$USE_UV" = true ]; then
-    echo "⚡ Python setup with uv"
-  else
-    echo "🐍 Python setup with Poetry"
-  fi
-
-  # Handle .venv compatibility
-  if [ -d ".venv" ]; then
-    if [ -x ".venv/bin/python" ]; then
-      CUR_V=$( .venv/bin/python --version | awk '{print $2}' | cut -d. -f1,2 )
-      SYS_V=$( "$PYTHON_BIN" --version | awk '{print $2}' | cut -d. -f1,2 )
-      if [ "$CUR_V" != "$SYS_V" ]; then
-        echo "🗑️ Removing incompatible .venv ($CUR_V vs $SYS_V)"
-        sudo rm -rf .venv
-      fi
-    else
-      echo "⚠️  Found non-executable .venv. Removing."
-      sudo rm -rf .venv
-    fi
-  fi
-
-  if [ "$USE_UV" = true ]; then
-    echo "📦 Installing Python dependencies with uv"
-    sudo -u "$DEPLOY_USER" "$UV_CMD" sync --no-dev
-  else
-    POETRY_BIN="/home/$DEPLOY_USER/.local/bin/poetry"
-
-    # Install/Repair Poetry
-    if ! sudo -u "$DEPLOY_USER" [ -x "$POETRY_BIN" ] || ! sudo -u "$DEPLOY_USER" "$POETRY_BIN" --version &>/dev/null; then
-      echo "📥 Installing/Repairing Poetry using $PYTHON_BIN"
-      curl -sSL https://install.python-poetry.org | sudo -u "$DEPLOY_USER" "$PYTHON_BIN" -
-    fi
-
-    export PATH="/home/$DEPLOY_USER/.local/bin:$PATH"
-
-    # Configure Poetry
-    sudo -u "$DEPLOY_USER" "$POETRY_BIN" config virtualenvs.in-project true
-
-    if [ ! -d ".venv" ]; then
-      echo "📦 Creating .venv with $PYTHON_BIN"
-      sudo -u "$DEPLOY_USER" "$PYTHON_BIN" -m venv .venv
-    fi
-
-    echo "📦 Installing Python dependencies with Poetry"
-    sudo -u "$DEPLOY_USER" "$POETRY_BIN" install --no-root --no-interaction
-  fi
+  echo "📦 Installing Python dependencies"
+  sudo -u "$DEPLOY_USER" env HOME="/home/$DEPLOY_USER" PATH="$PATH" "$UV_BIN" sync
 
   if [ ! -d ".venv" ]; then
     echo "❌ .venv not created"
@@ -244,17 +192,10 @@ if [ "$RUNTIME" = "python" ]; then
     echo "🎨 Collecting static files..."
     sudo -u "$DEPLOY_USER" .venv/bin/python manage.py collectstatic --noinput
   elif [ -f "app/main.py" ]; then
-    echo "🚀 FastAPI app detected. Running database setup..."
-
-    if [ -f "alembic.ini" ]; then
-      echo "🗄️ Running Alembic migrations"
-      sudo -u "$DEPLOY_USER" .venv/bin/alembic upgrade head
-      echo "✅ Alembic migrations applied"
-    else
-      echo "ℹ️ alembic.ini not found. Falling back to SQLAlchemy create_all"
-      sudo -u "$DEPLOY_USER" .venv/bin/python -c "try: from app.db.models import Base; from app.db.session import engine; Base.metadata.create_all(bind=engine); print('✅ Database schema initialized')
-except Exception as e: print(f'ℹ️ Database auto-init skipped or failed: {e}')"
-    fi
+    echo "🚀 FastAPI app detected. Initializing database schema..."
+    # Attempt to initialize DB schema if models are present
+    sudo -u "$DEPLOY_USER" .venv/bin/python -c "try: from app.db.models import Base; from app.db.session import engine; Base.metadata.create_all(bind=engine); print('✅ Database schema initialized')
+except Exception as e: print(f'ℹ️ Database auto-init skipped or failed: {e}')" || true
   else
     echo "ℹ️ No manage.py or app/main.py found. Skipping database-specific steps."
   fi
