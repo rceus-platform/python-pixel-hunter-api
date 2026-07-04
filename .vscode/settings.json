@@ -1,4 +1,6 @@
-// {
+{
+    "snyk.advanced.autoSelectOrganization": true
+} // {
 //   "python.defaultInterpreterPath": "${workspaceFolder}/application-source/.venv/bin/python",
 //   "python.analysis.extraPaths": [
 //     "${workspaceFolder}/application-source"
