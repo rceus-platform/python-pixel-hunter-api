@@ -1,7 +1,7 @@
 """Google search engine scraper implementation using Jina Reader proxy to avoid Selenium."""
 
 import logging
-from typing import List, Optional, cast
+from typing import Optional, cast
 from urllib.parse import quote_plus
 
 import httpx
@@ -18,7 +18,7 @@ from app.utilities.url_utils import is_google_internal_url, normalize_candidate_
 
 async def scrape_google_image_urls(
     query: str, client: httpx.AsyncClient, page: int = 0
-) -> List[str]:
+) -> list[str]:
     """Scrape Google Images using a text-based proxy mirror to avoid memory-heavy Selenium."""
 
     log_event(
@@ -47,7 +47,7 @@ async def scrape_google_image_urls(
         )
         return []
 
-    urls: List[str] = []
+    urls: list[str] = []
     seen: set[str] = set()
 
     def maybe_add_url(candidate: Optional[str]) -> None:
@@ -61,14 +61,14 @@ async def scrape_google_image_urls(
             urls.append(normalized)
 
     # First pass: try generic patterns
-    for match in cast(List[str], GENERIC_IMAGE_URL_PATTERN.findall(body)):
+    for match in cast(list[str], GENERIC_IMAGE_URL_PATTERN.findall(body)):
         maybe_add_url(match)
         if len(urls) >= MAX_CANDIDATES_PER_ENGINE:
             break
 
     # Second pass: try bare patterns if needed
     if len(urls) < MAX_CANDIDATES_PER_ENGINE:
-        for match in cast(List[str], GOOGLE_BARE_IMAGE_URL_PATTERN.findall(body)):
+        for match in cast(list[str], GOOGLE_BARE_IMAGE_URL_PATTERN.findall(body)):
             maybe_add_url(match)
             if len(urls) >= MAX_CANDIDATES_PER_ENGINE:
                 break

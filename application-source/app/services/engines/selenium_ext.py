@@ -6,7 +6,7 @@ import os
 import tempfile
 import time
 import zipfile
-from typing import List, Optional, Protocol, cast
+from typing import Optional, Protocol, cast
 from urllib.parse import quote_plus
 
 from selectolax.lexbor import LexborHTMLParser
@@ -131,7 +131,7 @@ def create_proxy_auth_extension(
     return plugin_path
 
 
-def scrape_engine_urls_with_selenium(query: str, engine: str) -> List[str]:
+def scrape_engine_urls_with_selenium(query: str, engine: str) -> list[str]:
     """Use Selenium as a browser fallback to collect image URLs."""
 
     try:
@@ -297,7 +297,7 @@ def scrape_engine_urls_with_selenium(query: str, engine: str) -> List[str]:
                 pass
 
     tree = LexborHTMLParser(page_html)
-    urls: List[str] = []
+    urls: list[str] = []
     seen: set[str] = set()
 
     def maybe_add_url(candidate: Optional[str]) -> None:
@@ -324,7 +324,7 @@ def scrape_engine_urls_with_selenium(query: str, engine: str) -> List[str]:
                 break
 
     if len(urls) < MAX_CANDIDATES_PER_ENGINE:
-        for match in cast(List[str], GENERIC_IMAGE_URL_PATTERN.findall(page_html)):
+        for match in cast(list[str], GENERIC_IMAGE_URL_PATTERN.findall(page_html)):
             maybe_add_url(match.replace("\\/", "/"))
             if len(urls) >= MAX_CANDIDATES_PER_ENGINE:
                 break

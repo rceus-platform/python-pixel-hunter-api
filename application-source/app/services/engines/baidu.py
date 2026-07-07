@@ -3,7 +3,7 @@
 import asyncio
 import json
 import logging
-from typing import List, Optional, cast
+from typing import Optional, cast
 
 import httpx
 
@@ -19,7 +19,7 @@ from app.utilities.url_utils import normalize_candidate_url
 
 async def scrape_baidu_image_urls(
     query: str, client: httpx.AsyncClient, page: int = 0
-) -> List[str]:
+) -> list[str]:
     """Scrape Baidu image JSON endpoint for candidate image URLs."""
 
     log_event(
@@ -60,11 +60,11 @@ async def scrape_baidu_image_urls(
         log_event(logging.WARNING, "Baidu request failed", event="scrape.baidu.failed")
         return []
 
-    urls: List[str] = []
+    urls: list[str] = []
     seen: set[str] = set()
     data_obj = payload.get("data")
     if isinstance(data_obj, list):
-        for item in cast(List[object], data_obj):
+        for item in cast(list[object], data_obj):
             if not isinstance(item, dict):
                 continue
             item_dict = cast(dict[str, object], item)

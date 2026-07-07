@@ -1,6 +1,6 @@
 """Pydantic schemas for search engine data models."""
 
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -26,8 +26,8 @@ class ImageSearchResult(BaseModel):
     search_engine: str
     note: str
     description: str
-    highlights: List[str] = Field(default_factory=list)
-    tags: List[str] = Field(default_factory=list)
+    highlights: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
     phash: Optional[str] = None
     unverified: Optional[bool] = False
 
@@ -35,6 +35,6 @@ class ImageSearchResult(BaseModel):
 class SearchResponse(BaseModel):
     """Envelope for search results."""
 
-    results: List[ImageSearchResult]
+    results: list[ImageSearchResult]
     query_hash: str
     engine_counts: dict[str, int]

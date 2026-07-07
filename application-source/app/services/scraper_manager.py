@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 from collections.abc import AsyncIterator
-from typing import Coroutine, List, Optional, Tuple
+from typing import Coroutine, Optional, Tuple
 import httpx
 from fastapi import HTTPException
 
@@ -41,9 +41,9 @@ from app.utilities.url_utils import (
 
 async def run_engine_task_with_timeout(
     engine_name: str,
-    task_coro: Coroutine[object, object, List[str]],
+    task_coro: Coroutine[object, object, list[str]],
     timeout_budget_seconds: Optional[float],
-) -> Tuple[Optional[List[str]], Optional[BaseException], float]:
+) -> Tuple[Optional[list[str]], Optional[BaseException], float]:
     """Run one engine scrape task with optional timeout ceiling and elapsed timing."""
 
     start = time.perf_counter()
@@ -67,7 +67,7 @@ async def run_engine_task_with_timeout(
 
 def _get_engine_coro(
     engine_name: str, query: str, client: httpx.AsyncClient, page: int
-) -> Coroutine[object, object, List[str]]:
+) -> Coroutine[object, object, list[str]]:
     """Helper to get the correct scraper coroutine for an engine."""
 
     if engine_name == "bing":
@@ -84,8 +84,8 @@ def _get_engine_coro(
 
 
 async def collect_engine_urls(
-    query: str, engines: List[str], client: httpx.AsyncClient, pages: int = 1
-) -> List[ImageCandidate]:
+    query: str, engines: list[str], client: httpx.AsyncClient, pages: int = 1
+) -> list[ImageCandidate]:
     """Execute selected search engine scrapers and return deduplicated URL candidates."""
 
     selected_engines = engines
@@ -144,7 +144,7 @@ async def collect_engine_urls(
 
     outputs = await asyncio.gather(*[spec[2] for spec in task_specs])
 
-    deduped: List[ImageCandidate] = []
+    deduped: list[ImageCandidate] = []
     seen: set[str] = set()
     for (engine_name, _, _), (engine_urls, output_error, elapsed_seconds) in zip(
         task_specs, outputs
@@ -181,10 +181,10 @@ async def collect_engine_urls(
 
 async def iterate_engine_candidates(
     query: str,
-    engines: List[str],
+    engines: list[str],
     client: httpx.AsyncClient,
     pages: int,
-) -> AsyncIterator[List[ImageCandidate]]:
+) -> AsyncIterator[list[ImageCandidate]]:
     """Collect candidates across pages; pages=0 means best-effort full crawl."""
 
     selected_engines = engines
@@ -212,7 +212,7 @@ async def iterate_engine_candidates(
     engine_empty_streaks = {engine: 0 for engine in selected_engines}
 
     for page_idx in range(page_limit):
-        page_candidates: List[ImageCandidate] = []
+        page_candidates: list[ImageCandidate] = []
         tasks = []
 
         for engine_name in list(active_engines):
@@ -305,7 +305,7 @@ async def iterate_engine_candidates(
             selenium_urls = await asyncio.to_thread(
                 scrape_engine_urls_with_selenium, query, engine_name
             )
-            fallback_candidates: List[ImageCandidate] = []
+            fallback_candidates: list[ImageCandidate] = []
             for url in selenium_urls:
                 if url in seen:
                     continue

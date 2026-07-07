@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import List, Optional, cast
+from typing import Optional, cast
 from urllib.parse import quote_plus
 
 import httpx
@@ -20,7 +20,7 @@ from app.utilities.url_utils import (
 
 async def scrape_bing_image_urls(
     query: str, client: httpx.AsyncClient, page: int = 0
-) -> List[str]:
+) -> list[str]:
     """Scrape Bing Images page and extract image source URLs from tile metadata."""
 
     log_event(
@@ -36,7 +36,7 @@ async def scrape_bing_image_urls(
     page_html = await fetch_html(client, search_url)
 
     tree = LexborHTMLParser(page_html)
-    urls: List[str] = []
+    urls: list[str] = []
     seen: set[str] = set()
 
     def maybe_add_url(candidate: Optional[str]) -> None:
@@ -87,7 +87,7 @@ async def scrape_bing_image_urls(
 
     if len(urls) < MAX_CANDIDATES_PER_ENGINE:
         pattern = GENERIC_IMAGE_URL_PATTERN
-        for match in cast(List[str], pattern.findall(page_html)):
+        for match in cast(list[str], pattern.findall(page_html)):
             maybe_add_url(match.replace("\\/", "/"))
             if len(urls) >= MAX_CANDIDATES_PER_ENGINE:
                 break

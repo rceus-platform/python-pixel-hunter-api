@@ -3,7 +3,7 @@
 import asyncio
 import json
 import logging
-from typing import Annotated, AsyncIterator, List, Optional, Tuple
+from typing import Annotated, AsyncIterator, Optional, Tuple
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -80,7 +80,7 @@ async def search_images(
         int, Query(ge=0, le=5, description="How many pages to scrape per engine")
     ] = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 20,
-) -> dict[str, List[ImageSearchResult]]:
+) -> dict[str, list[ImageSearchResult]]:
     """Search across engines, filter HD images, sort by resolution, and return top results."""
 
     cleaned_query = query.strip()
@@ -148,7 +148,7 @@ async def search_images(
         )
 
     verified_results = [item for item in evaluated if item]
-    results: List[ImageSearchResult] = verified_results
+    results: list[ImageSearchResult] = verified_results
 
     if allow_unverified:
         verified_urls = {item.url for item in verified_results}

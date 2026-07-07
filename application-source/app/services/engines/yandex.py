@@ -1,7 +1,7 @@
 """Yandex search and reverse image search engine scraper implementation."""
 
 import logging
-from typing import List, Optional, cast
+from typing import Optional, cast
 from urllib.parse import quote_plus
 
 import httpx
@@ -21,7 +21,7 @@ from app.utilities.url_utils import normalize_candidate_url
 
 async def scrape_yandex_image_urls(
     query: str, client: httpx.AsyncClient, page: int = 0
-) -> List[str]:
+) -> list[str]:
     """Scrape Yandex image search result page for image URLs."""
 
     log_event(
@@ -33,7 +33,7 @@ async def scrape_yandex_image_urls(
     page_html = await fetch_html(client, search_url)
     tree = LexborHTMLParser(page_html)
 
-    urls: List[str] = []
+    urls: list[str] = []
     seen: set[str] = set()
 
     def maybe_add_url(candidate: Optional[str]) -> None:
@@ -42,13 +42,13 @@ async def scrape_yandex_image_urls(
             seen.add(normalized)
             urls.append(normalized)
 
-    for match in cast(List[str], YANDEX_IMG_HREF_PATTERN.findall(page_html)):
+    for match in cast(list[str], YANDEX_IMG_HREF_PATTERN.findall(page_html)):
         maybe_add_url(match.replace("\\/", "/"))
         if len(urls) >= MAX_CANDIDATES_PER_ENGINE:
             break
 
     if len(urls) < MAX_CANDIDATES_PER_ENGINE:
-        for match in cast(List[str], YANDEX_ORIGIN_URL_PATTERN.findall(page_html)):
+        for match in cast(list[str], YANDEX_ORIGIN_URL_PATTERN.findall(page_html)):
             maybe_add_url(match.replace("\\/", "/"))
             if len(urls) >= MAX_CANDIDATES_PER_ENGINE:
                 break
@@ -64,7 +64,7 @@ async def scrape_yandex_image_urls(
                 break
 
     if len(urls) < MAX_CANDIDATES_PER_ENGINE:
-        for match in cast(List[str], GENERIC_IMAGE_URL_PATTERN.findall(page_html)):
+        for match in cast(list[str], GENERIC_IMAGE_URL_PATTERN.findall(page_html)):
             maybe_add_url(match.replace("\\/", "/"))
             if len(urls) >= MAX_CANDIDATES_PER_ENGINE:
                 break
@@ -80,17 +80,17 @@ async def scrape_yandex_image_urls(
 
 async def scrape_yandex_reverse_image_urls(
     image_url: str, client: httpx.AsyncClient
-) -> List[str]:
+) -> list[str]:
     """Scrape Yandex reverse image search result page and extract similar-image URLs."""
 
     url = f"https://yandex.com/images/search?rpt=imageview&url={quote_plus(image_url)}"
     page_html = await fetch_html(client, url)
 
-    urls: List[str] = []
+    urls: list[str] = []
     seen: set[str] = set()
 
     # Yandex often places source links in JSON payload values under "img_href".
-    for match in cast(List[str], YANDEX_IMG_HREF_PATTERN.findall(page_html)):
+    for match in cast(list[str], YANDEX_IMG_HREF_PATTERN.findall(page_html)):
         candidate = normalize_candidate_url(match.replace("\\/", "/"))
         if candidate and candidate not in seen:
             seen.add(candidate)

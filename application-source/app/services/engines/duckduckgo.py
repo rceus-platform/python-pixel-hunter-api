@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import List, Optional, cast
+from typing import Optional, cast
 from urllib.parse import quote_plus
 
 import httpx
@@ -22,7 +22,7 @@ from app.utilities.url_utils import normalize_candidate_url
 
 async def scrape_duckduckgo_image_urls(
     query: str, client: httpx.AsyncClient, page: int = 0
-) -> List[str]:
+) -> list[str]:
     """Scrape DuckDuckGo image results via vqd token + i.js endpoint."""
 
     log_event(
@@ -79,11 +79,11 @@ async def scrape_duckduckgo_image_urls(
         )
         return []
 
-    urls: List[str] = []
+    urls: list[str] = []
     seen: set[str] = set()
     results_obj = payload.get("results")
     if isinstance(results_obj, list):
-        for item in cast(List[object], results_obj):
+        for item in cast(list[object], results_obj):
             if not isinstance(item, dict):
                 continue
             item_dict = cast(dict[str, object], item)
